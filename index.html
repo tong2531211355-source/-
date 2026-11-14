@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MC Bedrock Particle Studio - สร้างเอฟเฟกต์มายคราฟ</title>
+    <!-- ฟอนต์ภาษาไทย Kanit และ Inter / JetBrains Mono สำหรับโค้ด -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- JSZip สำหรับสร้างไฟล์ .mcpack (ZIP archive) บนเบราว์เซอร์โดยตรง -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Kanit', 'Inter', sans-serif;
+            background-color: #0b0f19;
+            color: #e2e8f0;
+        }
+        .font-mono-code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* ปรับแต่ง Scrollbar สำหรับแถบควบคุมด้านล่าง */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.4);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 999px;
+        }
+        /* Custom Range Slider สไตล์ Studio */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: #1e293b;
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #10b981;
+            cursor: pointer;
+            border: 2px solid #ecfdf5;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        /* Canvas ป้องกันการเลื่อนหน้าจอขณะหมุนมุมกล้องหรือวาดเส้น */
+        #previewCanvas {
+            touch-action: none;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen select-none">
+
+    <!-- 1. แถบหัวข้อด้านบน (Top Header & Presets) -->
+    <header class="bg-slate-900/95 border-b border-slate-800 px-3 py-2 flex items-center justify-between gap-2 shrink-0 z-20">
+        <div class="flex items-center gap-2 min-w-0">
+            <!-- ไอคอนลูกบาศก์ Minecraft -->
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+            </div>
+            <div class="truncate">
+                <h1 class="text-sm sm:text-base font-bold text-white leading-tight truncate">MC Particle Studio</h1>
+                <p class="text-[10px] text-emerald-400 font-medium leading-none">Bedrock Edition • .mcpack</p>
+            </div>
+        </div>
+
+        <!-- ปุ่มเลือกพรีเซ็ตสำเร็จรูป (Quick Presets) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
+            <span class="text-[11px] text-slate-400 hidden sm:inline">พรีเซ็ต:</span>
+            <button onclick="loadPreset('lightning')" class="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 text-sky-300 text-xs font-medium whitespace-nowrap transition active:scale-95">
+                ⚡ ดาบสายฟ้า
+            </button>
+            <button onclick="loadPreset('phoenix')" class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-medium whitespace-nowrap transition active:scale-95">
+                🔥 วงแหวนฟีนิกซ์
+            </button>
+            <button onclick="loadPreset('galaxy')" class="px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/40 text-purple-300 text-xs font-medium whitespace-nowrap transition active:scale-95">
+                🌌 หมัดกาแล็กซี่
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. พื้นที่พรีวิว 3D Isometric / Top-Down (Preview Viewport) -->
+    <div id="canvasWrapper" class="relative w-full h-[42vh] sm:h-[48vh] bg-[#070a12] border-b border-slate-800 shrink-0 overflow-hidden">
+        <canvas id="previewCanvas"></canvas>
+
+        <!-- แถบแจ้งเตือนโหมดวาดเส้นอิสระ (แสดงเมื่อเลือกโหมด Freehand Draw) -->
+        <div id="drawBanner" class="hidden absolute top-2.5 left-1/2 -translate-x-1/2 bg-indigo-600/95 text-white text-xs px-3.5 py-1.5 rounded-full shadow-lg border border-indigo-400/50 flex items-center gap-2 z-10 pointer-events-none whitespace-nowrap">
+            <span class="w-2 h-2 rounded-full bg-amber-300 animate-ping"></span>
+            <span>ใช้นิ้วลากวาดรูปร่างบนจอได้เลย!</span>
+        </div>
+
+        <!-- มุมซ้ายบน: สถิติ FPS และจำนวนอนุภาค -->
+        <div class="absolute top-2.5 left-2.5 flex flex-col gap-1 pointer-events-none">
+            <div class="bg-slate-900/80 backdrop-blur-md border border-slate-700/70 px-2.5 py-1 rounded-lg text-[11px] text-slate-300 flex items-center gap-2">
+                <span id="particleCountBadge" class="text-emerald-400 font-bold">0 อนุภาค</span>
+                <span class="text-slate-600">|</span>
+                <span id="viewModeLabel" class="text-sky-400">มุมมอง 3D</span>
+            </div>
+        </div>
+
+        <!-- มุมขวาบน: ปุ่มสลับมุมมองกล้อง & รีเซ็ตกล้อง -->
+        <div class="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-10">
+            <button id="toggleCameraViewBtn" onclick="toggleCameraView()" class="bg-slate-900/85 hover:bg-slate-800 backdrop-blur-md border border-slate-700 px-2.5 py-1.5 rounded-lg text-xs text-slate-200 font-medium shadow active:scale-95 transition">
+                📐 มุมมองบน (Top)
+            </button>
+            <button onclick="resetCamera()" title="รีเซ็ตมุมกล้อง" class="bg-slate-900/85 hover:bg-slate-800 backdrop-blur-md border border-slate-700 p-1.5 rounded-lg text-slate-300 shadow active:scale-95 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- แถบควบคุมการเล่นด้านล่างของ Canvas (Play / Pause / Burst / Zoom) -->
+        <div class="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none z-10">
+            <div class="flex items-center gap-1.5 pointer-events-auto">
+                <button id="playPauseBtn" onclick="togglePlay()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg shadow-emerald-900/40 flex items-center gap-1.5 active:scale-95 transition">
+                    <span id="playPauseIcon">⏸</span>
+                    <span id="playPauseText">เล่นอยู่</span>
+                </button>
+                <button onclick="triggerBurst()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg shadow-amber-900/40 flex items-center gap-1 active:scale-95 transition">
+                    💥 ปล่อยพลัง (Burst)
+                </button>
+            </div>
+
+            <!-- ปุ่มซูมเข้า-ออกสำหรับมือถือ -->
+            <div class="flex items-center gap-1 pointer-events-auto bg-slate-900/85 backdrop-blur-md border border-slate-700 rounded-xl p-1">
+                <button onclick="adjustZoom(-0.15)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-200 font-bold text-sm active:scale-90">−</button>
+                <span id="zoomLabel" class="text-[11px] text-slate-400 px-1 font-mono-code">100%</span>
+                <button onclick="adjustZoom(0.15)" class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-800 text-slate-200 font-bold text-sm active:scale-90">+</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. แถบแท็บเมนูควบคุมด้านล่าง (Bottom Control Tabs) -->
+    <nav class="grid grid-cols-4 bg-slate-900 border-b border-slate-800 shrink-0 text-xs font-semibold">
+        <button onclick="switchTab('layers')" id="tab-btn-layers" class="tab-btn py-2.5 flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 border-emerald-500 text-emerald-400 bg-slate-800/40">
+            <span>📑 เลเยอร์</span>
+            <span id="layerCountPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 rounded-full">2</span>
+        </button>
+        <button onclick="switchTab('shape')" id="tab-btn-shape" class="tab-btn py-2.5 flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+            <span>✏️ รูปทรง/วาด</span>
+        </button>
+        <button onclick="switchTab('physics')" id="tab-btn-physics" class="tab-btn py-2.5 flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+            <span>🎨 สี & ฟิสิกส์</span>
+        </button>
+        <button onclick="switchTab('export')" id="tab-btn-export" class="tab-btn py-2.5 flex flex-col sm:flex-row items-center justify-center gap-1 border-b-2 border-transparent text-slate-400 hover:text-slate-200">
+            <span>📦 ส่งออก</span>
+        </button>
+    </nav>
+
+    <!-- 4. พื้นที่เนื้อหาแต่ละแท็บ (Scrollable Tab Panels) -->
+    <main class="flex-1 overflow-y-auto p-3.5 sm:p-5 bg-[#0b0f19]">
+        <div class="max-w-2xl mx-auto pb-8">
+
+            <!-- ==================== แท็บ 1: จัดการเลเยอร์ (LAYERS) ==================== -->
+            <section id="panel-layers" class="tab-panel space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-bold text-white">ชั้นเอฟเฟกต์ (Effect Layers)</h2>
+                        <p class="text-xs text-slate-400">ซ้อนทับหลายเลเยอร์เพื่อสร้างสกิลที่อลังการ</p>
+                    </div>
+                    <button onclick="addNewLayer()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow active:scale-95 transition">
+                        <span>+ เพิ่มเลเยอร์</span>
+                    </button>
+                </div>
+
+                <!-- รายการเลเยอร์ -->
+                <div id="layerListContainer" class="space-y-2"></div>
+
+                <!-- ตั้งค่าชื่อเลเยอร์ที่กำลังเลือก & เลือกชนิดอนุภาค Minecraft -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-3 mt-3">
+                    <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider">ตั้งค่าเลเยอร์ที่เลือก</div>
+                    
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1">ชื่อเลเยอร์</label>
+                        <input type="text" id="layerNameInput" oninput="updateActiveLayer('name', this.value)"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs text-slate-300 mb-1">ชนิดอนุภาคใน Minecraft Bedrock (Particle ID)</label>
+                        <select id="mcParticleSelect" onchange="handleParticlePresetChange(this.value)"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-white focus:border-emerald-500 focus:outline-none mb-2">
+                            <option value="minecraft:basic_flame_particle">🔥 เปลวไฟพื้นฐาน (basic_flame_particle)</option>
+                            <option value="minecraft:soul_fire_flame">👻 เปลวไฟวิญญาณ (soul_fire_flame)</option>
+                            <option value="minecraft:electric_spark_particle">⚡ ประกายสายฟ้า (electric_spark_particle)</option>
+                            <option value="minecraft:endrod">✨ แสงดาวเอนด์รอด (endrod)</option>
+                            <option value="minecraft:dragon_breath_trail">🐉 ลมหายใจมังกร (dragon_breath_trail)</option>
+                            <option value="minecraft:totem_particle">🔰 ละอองโทเทม (totem_particle)</option>
+                            <option value="minecraft:heart_particle">❤️ หัวใจ (heart_particle)</option>
+                            <option value="minecraft:crit">⚔️ ประกายคริติคอล (crit)</option>
+                            <option value="minecraft:sonic_explosion">💥 คลื่นเสียงวอร์เดน (sonic_explosion)</option>
+                            <option value="custom">✍️ กำหนดเอง (พิมพ์ ID เองด้านล่าง)</option>
+                        </select>
+                        <input type="text" id="mcParticleCustomInput" oninput="updateActiveLayer('particleId', this.value)"
+                            placeholder="เช่น minecraft:basic_flame_particle"
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono-code text-emerald-300 focus:border-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== แท็บ 2: รูปทรงและวาดอิสระ (SHAPE & DRAW) ==================== -->
+            <section id="panel-shape" class="tab-panel hidden space-y-4">
+                <div>
+                    <h2 class="text-sm font-bold text-white mb-1">เลือกรูปแบบการปล่อยอนุภาค (Emitter Shape)</h2>
+                    <p class="text-xs text-slate-400">กำหนดรูปทรงการเกิดของเอฟเฟกต์ในเลเยอร์นี้</p>
+                </div>
+
+                <!-- กริดปุ่มเลือกรูปทรง -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2" id="shapeSelectorGrid">
+                    <button onclick="setLayerShape('point')" data-shape="point" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">📍 จุดเดียว</div>
+                        <div class="text-[11px] opacity-75">Point / Explosion</div>
+                    </button>
+                    <button onclick="setLayerShape('ring')" data-shape="ring" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">⭕ วงแหวน</div>
+                        <div class="text-[11px] opacity-75">Circle / Aura Ring</div>
+                    </button>
+                    <button onclick="setLayerShape('sphere')" data-shape="sphere" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">🔮 ทรงกลม</div>
+                        <div class="text-[11px] opacity-75">3D Sphere / Orb</div>
+                    </button>
+                    <button onclick="setLayerShape('helix')" data-shape="helix" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">🌪️ เกลียวพายุ</div>
+                        <div class="text-[11px] opacity-75">Spiral / Helix</div>
+                    </button>
+                    <button onclick="setLayerShape('slash')" data-shape="slash" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">⚔️ รอยฟันดาบ</div>
+                        <div class="text-[11px] opacity-75">Slash Arc</div>
+                    </button>
+                    <button onclick="setLayerShape('freehand')" data-shape="freehand" class="shape-btn p-2.5 rounded-xl border text-left transition">
+                        <div class="text-base mb-0.5">✍️ วาดเองอิสระ</div>
+                        <div class="text-[11px] opacity-75">Freehand Draw</div>
+                    </button>
+                </div>
+
+                <!-- กล่องเครื่องมือวาดอิสระ (จะแสดงเมื่อเลือกโหมด freehand) -->
+                <div id="freehandControls" class="hidden bg-indigo-950/50 border border-indigo-500/40 rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-indigo-300">🎨 โหมดวาดเส้นเอฟเฟกต์ด้วยนิ้ว</span>
+                        <span id="drawnPointsCount" class="text-[11px] text-indigo-400">0 จุด</span>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        แตะและลากนิ้วบนหน้าจอพรีวิวด้านบนเพื่อวาดรูปทรงอะไรก็ได้ (เช่น ดาว, ตัวอักษร, คลื่นดาบ) อนุภาคจะเกิดตามเส้นที่คุณวาดทันที!
+                    </p>
+                    <div class="flex gap-2">
+                        <button onclick="clearFreehandPath()" class="flex-1 bg-rose-600/80 hover:bg-rose-600 text-white py-2 px-3 rounded-xl text-xs font-bold active:scale-95 transition">
+                            🗑️ ล้างเส้นที่วาด
+                        </button>
+                        <button onclick="generateStarFreehand()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-3 rounded-xl text-xs font-bold active:scale-95 transition">
+                            ⭐ วาดรูปดาวอัตโนมัติ
+                        </button>
+                    </div>
+                </div>
+
+                <!-- สไลเดอร์ปรับขนาดรูปทรงและการหมุน -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-3.5">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">รัศมี / ขนาดรูปทรง (Blocks)</span>
+                            <span id="val-radius" class="font-mono-code text-emerald-400 font-bold">1.5</span>
+                        </div>
+                        <input type="range" id="input-radius" min="0.1" max="5.0" step="0.1" oninput="updateActiveLayer('radius', parseFloat(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">ความสูง / ระยะยกตัว (Y Offset)</span>
+                            <span id="val-yOffset" class="font-mono-code text-emerald-400 font-bold">0.0</span>
+                        </div>
+                        <input type="range" id="input-yOffset" min="-2.0" max="4.0" step="0.1" oninput="updateActiveLayer('yOffset', parseFloat(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">ความเร็วการหมุน (Spin Speed)</span>
+                            <span id="val-spinSpeed" class="font-mono-code text-emerald-400 font-bold">1.0</span>
+                        </div>
+                        <input type="range" id="input-spinSpeed" min="-5.0" max="5.0" step="0.2" oninput="updateActiveLayer('spinSpeed', parseFloat(this.value))" class="w-full">
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== แท็บ 3: สีและฟิสิกส์ (PHYSICS & COLOR) ==================== -->
+            <section id="panel-physics" class="tab-panel hidden space-y-4">
+                <!-- การตั้งค่าสี -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                    <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider">สีของอนุภาค (Color Gradient)</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-300 mb-1.5">สีเริ่มต้น (Start Color)</label>
+                            <div class="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl p-1.5">
+                                <input type="color" id="input-startColor" oninput="updateActiveLayer('startColor', this.value)" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
+                                <span id="val-startColor" class="text-xs font-mono-code text-slate-300 uppercase">#38BDF8</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-300 mb-1.5">สีตอนจางหาย (End Color)</label>
+                            <div class="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl p-1.5">
+                                <input type="color" id="input-endColor" oninput="updateActiveLayer('endColor', this.value)" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
+                                <span id="val-endColor" class="text-xs font-mono-code text-slate-300 uppercase">#818CF8</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- การตั้งค่าฟิสิกส์และจำนวน -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 space-y-3.5">
+                    <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider">ฟิสิกส์และการเคลื่อนที่</h3>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">อัตราการเกิด (Spawn Rate / วินาที)</span>
+                            <span id="val-spawnRate" class="font-mono-code text-emerald-400 font-bold">40</span>
+                        </div>
+                        <input type="range" id="input-spawnRate" min="5" max="150" step="5" oninput="updateActiveLayer('spawnRate', parseInt(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">ความเร็วพุ่งกระจาย (Outward Speed)</span>
+                            <span id="val-speed" class="font-mono-code text-emerald-400 font-bold">1.0</span>
+                        </div>
+                        <input type="range" id="input-speed" min="0" max="6.0" step="0.1" oninput="updateActiveLayer('speed', parseFloat(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">แรงโน้มถ่วง (Gravity: ลบ = ลอยขึ้น, บวก = ตกลง)</span>
+                            <span id="val-gravity" class="font-mono-code text-emerald-400 font-bold">-1.0</span>
+                        </div>
+                        <input type="range" id="input-gravity" min="-8.0" max="8.0" step="0.2" oninput="updateActiveLayer('gravity', parseFloat(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">อายุของอนุภาค (Lifetime วินาที)</span>
+                            <span id="val-lifetime" class="font-mono-code text-emerald-400 font-bold">1.2</span>
+                        </div>
+                        <input type="range" id="input-lifetime" min="0.2" max="4.0" step="0.1" oninput="updateActiveLayer('lifetime', parseFloat(this.value))" class="w-full">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">ขนาดเม็ดอนุภาค (Particle Size)</span>
+                            <span id="val-size" class="font-mono-code text-emerald-400 font-bold">0.20</span>
+                        </div>
+                        <input type="range" id="input-size" min="0.05" max="0.60" step="0.02" oninput="updateActiveLayer('size', parseFloat(this.value))" class="w-full">
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== แท็บ 4: ส่งออกไฟล์เข้า MINECRAFT (EXPORT) ==================== -->
+            <section id="panel-export" class="tab-panel hidden space-y-4">
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <h2 class="text-sm font-bold text-white">ตั้งชื่อเอฟเฟกต์สำหรับส่งออก</h2>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Namespace (ชื่อหมวดหมู่)</label>
+                            <input type="text" id="exportNamespace" value="custom" oninput="updateExportPreview()"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono-code text-sky-300 focus:border-emerald-500 focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Effect ID (ชื่อเอฟเฟกต์ภาษาอังกฤษ)</label>
+                            <input type="text" id="exportEffectId" value="lightning_slash" oninput="updateExportPreview()"
+                                class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono-code text-emerald-300 focus:border-emerald-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <!-- ปุ่มดาวน์โหลดไฟล์ .mcpack และ .json -->
+                    <div class="pt-2 space-y-2.5">
+                        <button onclick="exportMcpack()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white py-3.5 px-4 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                            <span>📦 ดาวน์โหลดไฟล์ .mcpack (นำเข้าเกมได้ทันที)</span>
+                        </button>
+
+                        <button onclick="exportJsonFile()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                            <span>📄 ดาวน์โหลดเฉพาะไฟล์ .json (สำหรับนักพัฒนา Add-on)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- คำสั่งเสกในเกม Minecraft Bedrock -->
+                <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-amber-400">🎮 คำสั่งเสกเอฟเฟกต์ในเกม (Command)</span>
+                        <button onclick="copyCommand()" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-lg text-xs font-bold active:scale-95 transition">
+                            📋 คัดลอกคำสั่ง
+                        </button>
+                    </div>
+                    <div id="commandPreviewBox" class="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-mono-code text-emerald-300 break-all select-all">
+                        /particle custom:lightning_slash ~ ~1 ~
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                        <b>วิธีใช้งานบนมือถือ:</b> กดดาวน์โหลด <b>.mcpack</b> แล้วเปิดไฟล์ด้วยแอป Minecraft ตัวเกมจะติดตั้ง Resource Pack ให้อัตโนมัติ จากนั้นเปิดใช้งานแพ็กในโลกของคุณแล้วพิมพ์คำสั่งด้านบนในช่องแชทได้เลยครับ!
+                    </p>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- กล่องแจ้งเตือน Toast Message (แทน alert) -->
+    <div id="toastBox" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-slate-800 border border-emerald-500/50 text-white px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-medium flex items-center gap-2 opacity-0 pointer-events-none transition-all duration-300 z-50">
+        <span id="toastIcon">✅</span>
+        <span id="toastText">คัดลอกสำเร็จ!</span>
+    </div>
+
+    <script>
+        /**
+         * ============================================================================
+         * MINECRAFT BEDROCK PARTICLE & EFFECT STUDIO
+         * ============================================================================
+         * แอปสร้างและจำลองเอฟเฟกต์อนุภาคสำหรับ Minecraft Bedrock Edition
+         * รองรับการวาดเส้นอิสระ 3D Isometric Preview และสร้างไฟล์ .mcpack จริงด้วย JSZip
+         */
+
+        // --- 1. สถานะหลักของแอป (Application State) ---
+        const state = {
+            isPlaying: true,
+            cameraMode: '3d', // '3d' (Isometric rotatable) | 'top' (2D Top-down)
+            camYaw: 0.65,
+            camPitch: 0.55,
+            zoom: 1.0,
+            activeTab: 'layers',
+            activeLayerIndex: 0,
+            layers: [],
+            liveParticles: [],
+            simTime: 0
+        };
+
+        // --- 2. โครงสร้างข้อมูลเลเยอร์เริ่มต้น ---
+        function createDefaultLayer(overrides = {}) {
+            return {
+                id: 'layer_' + Math.random().toString(36).substr(2, 9),
+                name: 'เลเยอร์ใหม่',
+                visible: true,
+                particleId: 'minecraft:basic_flame_particle',
+                shape: 'ring', // 'point' | 'ring' | 'sphere' | 'helix' | 'slash' | 'freehand'
+                radius: 1.5,
+                yOffset: 0.2,
+                spinSpeed: 1.5,
+                startColor: '#38bdf8',
+                endColor: '#818cf8',
+                spawnRate: 45,
+                speed: 0.8,
+                gravity: -1.0,
+                lifetime: 1.1,
+                size: 0.20,
+                freehandPoints: [], // เก็บพิกัด [{x, z}, ...] เมื่อผู้ใช้วาดเอง
+                spawnAccumulator: 0,
+                ...overrides
+            };
+        }
+
+        // --- 3. พรีเซ็ตสกิลสำเร็จรูป 3 แบบ ---
+        const PRESETS = {
+            lightning: {
+                effectId: 'lightning_slash',
+                layers: [
+                    createDefaultLayer({
+                        name: 'คมดาบสายฟ้า (Slash Arc)',
+                        particleId: 'minecraft:electric_spark_particle',
+                        shape: 'slash',
+                        radius: 2.2,
+                        yOffset: 1.0,
+                        spinSpeed: 3.5,
+                        startColor: '#e0f2fe',
+                        endColor: '#0284c7',
+                        spawnRate: 85,
+                        speed: 0.6,
+                        gravity: 0,
+                        lifetime: 0.6,
+                        size: 0.22
+                    }),
+                    createDefaultLayer({
+                        name: 'ประกายไฟฟ้ารอบตัว',
+                        particleId: 'minecraft:endrod',
+                        shape: 'ring',
+                        radius: 1.4,
+                        yOffset: 0.1,
+                        spinSpeed: -2.0,
+                        startColor: '#38bdf8',
+                        endColor: '#1d4ed8',
+                        spawnRate: 35,
+                        speed: 1.4,
+                        gravity: -1.8,
+                        lifetime: 0.9,
+                        size: 0.16
+                    })
+                ]
+            },
+            phoenix: {
+                effectId: 'phoenix_aura',
+                layers: [
+                    createDefaultLayer({
+                        name: 'วงแหวนเพลิงฟีนิกซ์',
+                        particleId: 'minecraft:basic_flame_particle',
+                        shape: 'ring',
+                        radius: 1.8,
+                        yOffset: 0.1,
+                        spinSpeed: 2.2,
+                        startColor: '#fef08a',
+                        endColor: '#dc2626',
+                        spawnRate: 65,
+                        speed: 0.5,
+                        gravity: -2.5,
+                        lifetime: 1.2,
+                        size: 0.24
+                    }),
+                    createDefaultLayer({
+                        name: 'เกลียวพายุเพลิง',
+                        particleId: 'minecraft:totem_particle',
+                        shape: 'helix',
+                        radius: 1.2,
+                        yOffset: 0.0,
+                        spinSpeed: 4.0,
+                        startColor: '#fb923c',
+                        endColor: '#991b1b',
+                        spawnRate: 50,
+                        speed: 0.4,
+                        gravity: -3.0,
+                        lifetime: 1.4,
+                        size: 0.18
+                    })
+                ]
+            },
+            galaxy: {
+                effectId: 'galaxy_impact',
+                layers: [
+                    createDefaultLayer({
+                        name: 'แกนกลางหลุมดำ (Core)',
+                        particleId: 'minecraft:dragon_breath_trail',
+                        shape: 'sphere',
+                        radius: 0.9,
+                        yOffset: 1.2,
+                        spinSpeed: 2.5,
+                        startColor: '#f5d0fe',
+                        endColor: '#7e22ce',
+                        spawnRate: 60,
+                        speed: 1.2,
+                        gravity: 0,
+                        lifetime: 1.0,
+                        size: 0.22
+                    }),
+                    createDefaultLayer({
+                        name: 'วงโคจรดวงดาว',
+                        particleId: 'minecraft:soul_fire_flame',
+                        shape: 'ring',
+                        radius: 2.4,
+                        yOffset: 1.2,
+                        spinSpeed: -3.0,
+                        startColor: '#67e8f9',
+                        endColor: '#4f46e5',
+                        spawnRate: 55,
+                        speed: 0.3,
+                        gravity: 0.2,
+                        lifetime: 1.5,
+                        size: 0.18
+                    })
+                ]
+            }
+        };
+
+        function loadPreset(presetKey) {
+            const preset = PRESETS[presetKey];
+            if (!preset) return;
+            // คัดลอกออบเจกต์ใหม่เพื่อไม่ให้แก้ไขทับต้นฉบับ
+            state.layers = preset.layers.map(l => ({ ...l, freehandPoints: [...l.freehandPoints] }));
+            state.activeLayerIndex = 0;
+            state.liveParticles = [];
+            document.getElementById('exportEffectId').value = preset.effectId;
+            syncUIWithState();
+            updateExportPreview();
+            triggerBurst();
+            showToast(`โหลดพรีเซ็ต "${preset.effectId}" แล้ว`);
+        }
+
+        // --- 4. ระบบ Canvas และการฉายภาพ 3D Isometric (3D Projection & Renderer) ---
+        const canvas = document.getElementById('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        let canvasWidth = 0;
+        let canvasHeight = 0;
+
+        function resizePreviewCanvas() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            canvasWidth = wrapper.clientWidth;
+            canvasHeight = wrapper.clientHeight;
+            canvas.width = canvasWidth * dpr;
+            canvas.height = canvasHeight * dpr;
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        // แปลงพิกัด 3D ในโลก Minecraft (x, y, z) -> พิกัด 2D บนหน้าจอ (screenX, screenY, depth)
+        function project3D(x, y, z) {
+            const scaleBase = Math.min(canvasWidth, canvasHeight) * 0.13 * state.zoom;
+            const centerX = canvasWidth / 2;
+            const centerY = canvasHeight * 0.62;
+
+            if (state.cameraMode === 'top') {
+                return {
+                    sx: centerX + x * scaleBase,
+                    sy: (canvasHeight * 0.5) + z * scaleBase,
+                    scale: scaleBase
+                };
+            }
+
+            // หมุนรอบแกน Y (Yaw)
+            const cosY = Math.cos(state.camYaw);
+            const sinY = Math.sin(state.camYaw);
+            const rx = x * cosY - z * sinY;
+            const rz = x * sinY + z * cosY;
+
+            // ก้ม-เงยแกน X (Pitch)
+            const cosP = Math.cos(state.camPitch);
+            const sinP = Math.sin(state.camPitch);
+            const ry = y * cosP - rz * sinP;
+
+            return {
+                sx: centerX + rx * scaleBase,
+                sy: centerY - ry * scaleBase,
+                scale: scaleBase
+            };
+        }
+
+        // แปลงพิกัดหน้าจอ 2D กลับเป็นพิกัดพื้น 3D (x, z) สำหรับโหมดวาดเส้นอิสระ
+        function screenToWorldXZ(sx, sy) {
+            const scaleBase = Math.min(canvasWidth, canvasHeight) * 0.13 * state.zoom;
+            const centerX = canvasWidth / 2;
+            const centerY = state.cameraMode === 'top' ? (canvasHeight * 0.5) : (canvasHeight * 0.62);
+
+            if (state.cameraMode === 'top') {
+                return {
+                    x: (sx - centerX) / scaleBase,
+                    z: (sy - centerY) / scaleBase
+                };
+            }
+
+            const rx = (sx - centerX) / scaleBase;
+            const ry = -(sy - centerY) / scaleBase;
+            const sinP = Math.max(0.25, Math.sin(state.camPitch));
+            const rz = -ry / sinP;
+
+            const cosY = Math.cos(-state.camYaw);
+            const sinY = Math.sin(-state.camYaw);
+            return {
+                x: rx * cosY - rz * sinY,
+                z: rx * sinY + rz * cosY
+            };
+        }
+
+        // --- 5. การจำลองอนุภาค (Particle Spawning & Physics Simulation) ---
+        function hexToRgb(hex) {
+            const clean = hex.replace('#', '');
+            const num = parseInt(clean, 16);
+            return {
+                r: (num >> 16) & 255,
+                g: (num >> 8) & 255,
+                b: num & 255
+            };
+        }
+
+        function lerpColor(hexA, hexB, t) {
+            const a = hexToRgb(hexA);
+            const b = hexToRgb(hexB);
+            const r = Math.round(a.r + (b.r - a.r) * t);
+            const g = Math.round(a.g + (b.g - a.g) * t);
+            const bl = Math.round(a.b + (b.b - a.b) * t);
+            return `rgb(${r}, ${g}, ${bl})`;
+        }
+
+        function spawnParticleFromLayer(layer, progressOverride = null) {
+            let x = 0, y = layer.yOffset, z = 0;
+            let vx = 0, vy = 0, vz = 0;
+            const angle = (progressOverride !== null ? progressOverride * Math.PI * 2 : Math.random() * Math.PI * 2) + (state.simTime * layer.spinSpeed);
+
+            switch (layer.shape) {
+                case 'point': {
+                    // สุ่มทิศทางทรงกลมเล็กๆ
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const dirX = Math.sin(phi) * Math.cos(theta);
+                    const dirY = Math.cos(phi);
+                    const dirZ = Math.sin(phi) * Math.sin(theta);
+                    x = dirX * 0.1;
+                    y = layer.yOffset + dirY * 0.1;
+                    z = dirZ * 0.1;
+                    vx = dirX * layer.speed;
+                    vy = dirY * layer.speed;
+                    vz = dirZ * layer.speed;
+                    break;
+                }
+                case 'ring': {
+                    x = Math.cos(angle) * layer.radius;
+                    z = Math.sin(angle) * layer.radius;
+                    y = layer.yOffset;
+                    vx = Math.cos(angle) * layer.speed;
+                    vz = Math.sin(angle) * layer.speed;
+                    vy = (Math.random() - 0.3) * 0.3 * layer.speed;
+                    break;
+                }
+                case 'sphere': {
+                    const theta = Math.random() * Math.PI * 2 + (state.simTime * layer.spinSpeed);
+                    const phi = Math.acos(2 * Math.random() - 1);
+                    const dirX = Math.sin(phi) * Math.cos(theta);
+                    const dirY = Math.cos(phi);
+                    const dirZ = Math.sin(phi) * Math.sin(theta);
+                    x = dirX * layer.radius;
+                    y = layer.yOffset + dirY * layer.radius;
+                    z = dirZ * layer.radius;
+                    vx = dirX * layer.speed;
+                    vy = dirY * layer.speed;
+                    vz = dirZ * layer.speed;
+                    break;
+                }
+                case 'helix': {
+                    const hProgress = (state.simTime * 0.8 + Math.random() * 0.2) % 1;
+                    const helixAngle = hProgress * Math.PI * 4 + (state.simTime * layer.spinSpeed);
+                    x = Math.cos(helixAngle) * layer.radius * (1 - hProgress * 0.3);
+                    z = Math.sin(helixAngle) * layer.radius * (1 - hProgress * 0.3);
+                    y = layer.yOffset + hProgress * 2.5;
+                    vx = Math.cos(helixAngle) * layer.speed * 0.4;
+                    vz = Math.sin(helixAngle) * layer.speed * 0.4;
+                    vy = layer.speed * 0.5;
+                    break;
+                }
+                case 'slash': {
+                    // ส่วนโค้งฟันดาบ 140 องศา เอียงทำมุมเท่ๆ
+                    const arcSpan = Math.PI * 0.8;
+                    const t = progressOverride !== null ? progressOverride : Math.random();
+                    const slashAngle = -arcSpan / 2 + t * arcSpan + (state.simTime * layer.spinSpeed * 0.4);
+                    const sx = Math.cos(slashAngle) * layer.radius;
+                    const sz = Math.sin(slashAngle) * layer.radius;
+                    x = sx;
+                    z = sz;
+                    y = layer.yOffset + Math.sin(t * Math.PI) * 0.6;
+                    vx = Math.cos(slashAngle) * layer.speed;
+                    vz = Math.sin(slashAngle) * layer.speed;
+                    vy = 0.1;
+                    break;
+                }
+                case 'freehand': {
+                    if (layer.freehandPoints.length > 0) {
+                        const idx = progressOverride !== null
+                            ? Math.floor(progressOverride * (layer.freehandPoints.length - 1))
+                            : Math.floor(Math.random() * layer.freehandPoints.length);
+                        const pt = layer.freehandPoints[idx];
+                        // หมุนเส้นที่วาดตาม spinSpeed ได้ด้วย
+                        const spinA = state.simTime * layer.spinSpeed * 0.5;
+                        const rx = pt.x * Math.cos(spinA) - pt.z * Math.sin(spinA);
+                        const rz = pt.x * Math.sin(spinA) + pt.z * Math.cos(spinA);
+                        x = rx;
+                        z = rz;
+                        y = layer.yOffset;
+                        vx = (Math.random() - 0.5) * layer.speed * 0.6;
+                        vz = (Math.random() - 0.5) * layer.speed * 0.6;
+                        vy = layer.speed * 0.3;
+                    } else {
+                        // ถ้ายังไม่วาด ให้เกิดเป็นวงกลมเล็กๆ แทน
+                        x = Math.cos(angle) * 0.5;
+                        z = Math.sin(angle) * 0.5;
+                        y = layer.yOffset;
+                    }
+                    break;
+                }
+            }
+
+            state.liveParticles.push({
+                x, y, z,
+                vx, vy, vz,
+                gravity: layer.gravity,
+                age: 0,
+                lifetime: layer.lifetime * (0.85 + Math.random() * 0.3),
+                size: layer.size,
+                startColor: layer.startColor,
+                endColor: layer.endColor
+            });
+        }
+
+        // ปล่อยพลังครั้งใหญ่ทันที (Burst Button)
+        function triggerBurst() {
+            state.layers.forEach(layer => {
+                if (!layer.visible) return;
+                const burstCount = Math.min(45, Math.max(20, Math.floor(layer.spawnRate * 0.7)));
+                for (let i = 0; i < burstCount; i++) {
+                    spawnParticleFromLayer(layer, i / burstCount);
+                }
+            });
+        }
+
+        function updateSimulation(dt) {
+            if (!state.isPlaying) return;
+            state.simTime += dt;
+
+            // สร้างอนุภาคใหม่ตามอัตรา Spawn Rate ของแต่ละเลเยอร์
+            state.layers.forEach(layer => {
+                if (!layer.visible) return;
+                layer.spawnAccumulator += layer.spawnRate * dt;
+                while (layer.spawnAccumulator >= 1) {
+                    layer.spawnAccumulator -= 1;
+                    // จำกัดจำนวนอนุภาคสูงสุดบนมือถือไม่ให้เกิน 600 เม็ดเพื่อความลื่นไหล 60fps
+                    if (state.liveParticles.length < 600) {
+                        spawnParticleFromLayer(layer);
+                    }
+                }
+            });
+
+            // อัปเดตตำแหน่งและความเร็วอนุภาคทั้งหมด
+            for (let i = state.liveParticles.length - 1; i >= 0; i--) {
+                const p = state.liveParticles[i];
+                p.age += dt;
+                if (p.age >= p.lifetime) {
+                    state.liveParticles.splice(i, 1);
+                    continue;
+                }
+                p.vy -= p.gravity * dt; // แรงโน้มถ่วง (ลบ = ลอยขึ้น, บวก = ตกลง)
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.z += p.vz * dt;
+            }
+        }
+
+        function renderCanvas() {
+            // 1. พื้นหลัง
+            ctx.fillStyle = '#070a12';
+            ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+            // 2. วาดตารางบล็อก Minecraft (Grid 5x5 บล็อก)
+            ctx.lineWidth = 1;
+            const gridRange = 3;
+            for (let i = -gridRange; i <= gridRange; i++) {
+                const p1 = project3D(i, 0, -gridRange);
+                const p2 = project3D(i, 0, gridRange);
+                ctx.strokeStyle = i === 0 ? 'rgba(56, 189, 248, 0.25)' : 'rgba(148, 163, 184, 0.12)';
+                ctx.beginPath();
+                ctx.moveTo(p1.sx, p1.sy);
+                ctx.lineTo(p2.sx, p2.sy);
+                ctx.stroke();
+
+                const p3 = project3D(-gridRange, 0, i);
+                const p4 = project3D(gridRange, 0, i);
+                ctx.strokeStyle = i === 0 ? 'rgba(244, 63, 94, 0.25)' : 'rgba(148, 163, 184, 0.12)';
+                ctx.beginPath();
+                ctx.moveTo(p3.sx, p3.sy);
+                ctx.lineTo(p4.sx, p4.sy);
+                ctx.stroke();
+            }
+
+            // 3. วาดหุ่นจำลองตัวละคร (Player Silhouette สูง 1.8 บล็อก) เพื่อเทียบสเกล
+            const basePos = project3D(0, 0, 0);
+            const headPos = project3D(0, 1.8, 0);
+            const bodyHeight = Math.abs(basePos.sy - headPos.sy);
+            if (bodyHeight > 8 && state.cameraMode === '3d') {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(148, 163, 184, 0.28)';
+                ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
+                ctx.lineWidth = 1.5;
+                const w = bodyHeight * 0.26;
+                // ลำตัว
+                ctx.fillRect(basePos.sx - w / 2, headPos.sy + w * 0.9, w, bodyHeight - w * 0.9);
+                ctx.strokeRect(basePos.sx - w / 2, headPos.sy + w * 0.9, w, bodyHeight - w * 0.9);
+                // ศีรษะ
+                ctx.fillRect(basePos.sx - w * 0.45, headPos.sy, w * 0.9, w * 0.9);
+                ctx.strokeRect(basePos.sx - w * 0.45, headPos.sy, w * 0.9, w * 0.9);
+                ctx.restore();
+            }
+
+            // 4. วาดเส้นไกด์ของโหมด Freehand Draw (หากเลเยอร์ปัจจุบันเป็น freehand)
+            const activeLayer = state.layers[state.activeLayerIndex];
+            if (activeLayer && activeLayer.shape === 'freehand' && activeLayer.freehandPoints.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(129, 140, 248, 0.55)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                activeLayer.freehandPoints.forEach((pt, idx) => {
+                    const proj = project3D(pt.x, activeLayer.yOffset, pt.z);
+                    if (idx === 0) ctx.moveTo(proj.sx, proj.sy);
+                    else ctx.lineTo(proj.sx, proj.sy);
+                });
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 5. วาดอนุภาคทั้งหมดพร้อมแสงเรืองรอง (Additive Glow)
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            for (let p of state.liveParticles) {
+                const lifeRatio = p.age / p.lifetime;
+                const alpha = Math.sin((1 - lifeRatio) * Math.PI * 0.5); // ค่อยๆ จางลงตอนท้าย
+                const proj = project3D(p.x, p.y, p.z);
+                const pixelRadius = Math.max(1.5, p.size * proj.scale * (1 - lifeRatio * 0.35));
+                const color = lerpColor(p.startColor, p.endColor, lifeRatio);
+
+                ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(proj.sx, proj.sy, pixelRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // จุดแกนกลางสว่าง (Core Highlight)
+                if (pixelRadius > 3) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.globalAlpha = alpha * 0.65;
+                    ctx.beginPath();
+                    ctx.arc(proj.sx, proj.sy, pixelRadius * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            ctx.restore();
+
+            // อัปเดตตัวเลขจำนวนอนุภาคบน HUD
+            document.getElementById('particleCountBadge').textContent = `${state.liveParticles.length} อนุภาค`;
+        }
+
+        // --- 6. ระบบสัมผัสบนหน้าจอ (Touch / Mouse Drag: หมุนกล้อง หรือ วาดเส้นอิสระ) ---
+        let isPointerDown = false;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+
+        function handleCanvasPointerDown(clientX, clientY) {
+            isPointerDown = true;
+            lastPointerX = clientX;
+            lastPointerY = clientY;
+
+            const activeLayer = state.layers[state.activeLayerIndex];
+            if (activeLayer && activeLayer.shape === 'freehand') {
+                const rect = canvas.getBoundingClientRect();
+                const worldPt = screenToWorldXZ(clientX - rect.left, clientY - rect.top);
+                // จำกัดระยะไม่ให้หลุดขอบ 4 บล็อก
+                worldPt.x = Math.max(-4, Math.min(4, worldPt.x));
+                worldPt.z = Math.max(-4, Math.min(4, worldPt.z));
+                activeLayer.freehandPoints.push(worldPt);
+                updateDrawnPointsUI();
+            }
+        }
+
+        function handleCanvasPointerMove(clientX, clientY) {
+            if (!isPointerDown) return;
+            const activeLayer = state.layers[state.activeLayerIndex];
+
+            if (activeLayer && activeLayer.shape === 'freehand') {
+                // บันทึกเส้นวาดอิสระ
+                const rect = canvas.getBoundingClientRect();
+                const worldPt = screenToWorldXZ(clientX - rect.left, clientY - rect.top);
+                worldPt.x = Math.max(-4, Math.min(4, worldPt.x));
+                worldPt.z = Math.max(-4, Math.min(4, worldPt.z));
+
+                const pts = activeLayer.freehandPoints;
+                if (pts.length === 0 || Math.hypot(worldPt.x - pts[pts.length - 1].x, worldPt.z - pts[pts.length - 1].z) > 0.08) {
+                    pts.push(worldPt);
+                    updateDrawnPointsUI();
+                }
+            } else if (state.cameraMode === '3d') {
+                // หมุนมุมกล้อง 3D
+                const dx = clientX - lastPointerX;
+                const dy = clientY - lastPointerY;
+                state.camYaw += dx * 0.01;
+                state.camPitch = Math.max(0.1, Math.min(1.45, state.camPitch + dy * 0.01));
+            }
+
+            lastPointerX = clientX;
+            lastPointerY = clientY;
+        }
+
+        function handleCanvasPointerUp() {
+            isPointerDown = false;
+        }
+
+        canvas.addEventListener('mousedown', e => handleCanvasPointerDown(e.clientX, e.clientY));
+        window.addEventListener('mousemove', e => handleCanvasPointerMove(e.clientX, e.clientY));
+        window.addEventListener('mouseup', handleCanvasPointerUp);
+
+        canvas.addEventListener('touchstart', e => {
+            if (e.touches.length === 1) {
+                handleCanvasPointerDown(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchmove', e => {
+            if (e.touches.length === 1) {
+                handleCanvasPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        canvas.addEventListener('touchend', handleCanvasPointerUp);
+
+        // --- 7. การควบคุม UI และเลเยอร์ (UI Controls & Layer Management) ---
+        function switchTab(tabName) {
+            state.activeTab = tabName;
+            document.querySelectorAll('.tab-panel').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`panel-${tabName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-emerald-500', 'text-emerald-400', 'bg-slate-800/40');
+                btn.classList.add('border-transparent', 'text-slate-400');
+            });
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.classList.remove('border-transparent', 'text-slate-400');
+            activeBtn.classList.add('border-emerald-500', 'text-emerald-400', 'bg-slate-800/40');
+        }
+
+        function togglePlay() {
+            state.isPlaying = !state.isPlaying;
+            document.getElementById('playPauseIcon').textContent = state.isPlaying ? '⏸' : '▶️';
+            document.getElementById('playPauseText').textContent = state.isPlaying ? 'เล่นอยู่' : 'หยุดชั่วคราว';
+        }
+
+        function toggleCameraView() {
+            state.cameraMode = state.cameraMode === '3d' ? 'top' : '3d';
+            document.getElementById('viewModeLabel').textContent = state.cameraMode === '3d' ? 'มุมมอง 3D' : 'มุมมองบน (2D)';
+            document.getElementById('toggleCameraViewBtn').textContent = state.cameraMode === '3d' ? '📐 มุมมองบน (Top)' : '🧊 มุมมอง 3D';
+        }
+
+        function resetCamera() {
+            state.camYaw = 0.65;
+            state.camPitch = 0.55;
+            state.zoom = 1.0;
+            document.getElementById('zoomLabel').textContent = '100%';
+        }
+
+        function adjustZoom(delta) {
+            state.zoom = Math.max(0.4, Math.min(2.5, state.zoom + delta));
+            document.getElementById('zoomLabel').textContent = Math.round(state.zoom * 100) + '%';
+        }
+
+        function renderLayerList() {
+            const container = document.getElementById('layerListContainer');
+            document.getElementById('layerCountPill').textContent = state.layers.length;
+            container.innerHTML = '';
+
+            state.layers.forEach((layer, idx) => {
+                const isSelected = idx === state.activeLayerIndex;
+                const card = document.createElement('div');
+                card.className = `flex items-center justify-between p-2.5 rounded-xl border transition cursor-pointer ${
+                    isSelected
+                        ? 'bg-emerald-950/40 border-emerald-500/70 shadow-sm'
+                        : 'bg-slate-900/70 border-slate-800 hover:border-slate-700'
+                }`;
+                card.onclick = () => {
+                    state.activeLayerIndex = idx;
+                    syncUIWithState();
+                };
+
+                card.innerHTML = `
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <span class="w-3.5 h-3.5 rounded-full shrink-0 border border-white/30" style="background: linear-gradient(135deg, ${layer.startColor}, ${layer.endColor})"></span>
+                        <div class="truncate">
+                            <div class="text-xs font-bold text-white truncate">${layer.name}</div>
+                            <div class="text-[10px] text-slate-400 font-mono-code truncate">${layer.shape.toUpperCase()} • ${layer.particleId.replace('minecraft:', '')}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                        <button onclick="toggleLayerVisibility(${idx})" title="ซ่อน/แสดง" class="p-1.5 rounded-lg hover:bg-slate-800 text-xs ${layer.visible ? 'text-emerald-400' : 'text-slate-600'}">
+                            ${layer.visible ? '👁️' : '🙈'}
+                        </button>
+                        ${state.layers.length > 1 ? `
+                        <button onclick="deleteLayer(${idx})" title="ลบเลเยอร์" class="p-1.5 rounded-lg hover:bg-rose-950/60 text-rose-400 text-xs">
+                            🗑️
+                        </button>` : ''}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function addNewLayer() {
+            const newLayer = createDefaultLayer({
+                name: `เลเยอร์ที่ ${state.layers.length + 1}`,
+                startColor: '#34d399',
+                endColor: '#059669'
+            });
+            state.layers.push(newLayer);
+            state.activeLayerIndex = state.layers.length - 1;
+            syncUIWithState();
+            showToast('เพิ่มเลเยอร์ใหม่แล้ว');
+        }
+
+        function deleteLayer(idx) {
+            if (state.layers.length <= 1) return;
+            state.layers.splice(idx, 1);
+            state.activeLayerIndex = Math.max(0, Math.min(state.layers.length - 1, state.activeLayerIndex));
+            syncUIWithState();
+        }
+
+        function toggleLayerVisibility(idx) {
+            state.layers[idx].visible = !state.layers[idx].visible;
+            renderLayerList();
+        }
+
+        function updateActiveLayer(key, value) {
+            const layer = state.layers[state.activeLayerIndex];
+            if (!layer) return;
+            layer[key] = value;
+
+            // อัปเดตตัวเลขกำกับสไลเดอร์
+            const valLabel = document.getElementById(`val-${key}`);
+            if (valLabel) {
+                valLabel.textContent = typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(2).replace(/0$/, '') : value;
+            }
+            if (key === 'name' || key === 'particleId') {
+                renderLayerList();
+            }
+        }
+
+        function handleParticlePresetChange(val) {
+            if (val !== 'custom') {
+                document.getElementById('mcParticleCustomInput').value = val;
+                updateActiveLayer('particleId', val);
+            }
+        }
+
+        function setLayerShape(shape) {
+            updateActiveLayer('shape', shape);
+            syncUIWithState();
+            if (shape === 'freehand') {
+                // สลับเป็นมุมมองบนชั่วคราวเพื่อให้วาดเส้นด้วยนิ้วได้ง่ายและแม่นยำขึ้น
+                if (state.cameraMode === '3d') {
+                    toggleCameraView();
+                }
+                showToast('แตะลากนิ้วบนจอพรีวิวด้านบนเพื่อวาดเส้นได้เลย!');
+            }
+        }
+
+        function clearFreehandPath() {
+            const layer = state.layers[state.activeLayerIndex];
+            if (layer) {
+                layer.freehandPoints = [];
+                updateDrawnPointsUI();
+            }
+        }
+
+        function generateStarFreehand() {
+            const layer = state.layers[state.activeLayerIndex];
+            if (!layer) return;
+            const pts = [];
+            const spikes = 5;
+            const outerR = 2.0;
+            const innerR = 0.85;
+            const totalSteps = 60;
+            for (let i = 0; i <= totalSteps; i++) {
+                const t = i / totalSteps;
+                const idx = t * spikes * 2;
+                const seg = Math.floor(idx);
+                const frac = idx - seg;
+                const a1 = (seg * Math.PI) / spikes - Math.PI / 2;
+                const a2 = ((seg + 1) * Math.PI) / spikes - Math.PI / 2;
+                const r1 = seg % 2 === 0 ? outerR : innerR;
+                const r2 = (seg + 1) % 2 === 0 ? outerR : innerR;
+                const x1 = Math.cos(a1) * r1, z1 = Math.sin(a1) * r1;
+                const x2 = Math.cos(a2) * r2, z2 = Math.sin(a2) * r2;
+                pts.push({
+                    x: x1 + (x2 - x1) * frac,
+                    z: z1 + (z2 - z1) * frac
+                });
+            }
+            layer.freehandPoints = pts;
+            updateDrawnPointsUI();
+            triggerBurst();
+        }
+
+        function updateDrawnPointsUI() {
+            const layer = state.layers[state.activeLayerIndex];
+            const count = layer ? layer.freehandPoints.length : 0;
+            document.getElementById('drawnPointsCount').textContent = `${count} จุด`;
+        }
+
+        // ซิงค์ค่าจาก State ไปแสดงบนฟอร์มควบคุมทั้งหมด
+        function syncUIWithState() {
+            renderLayerList();
+            const layer = state.layers[state.activeLayerIndex];
+            if (!layer) return;
+
+            document.getElementById('layerNameInput').value = layer.name;
+            document.getElementById('mcParticleCustomInput').value = layer.particleId;
+
+            const selectEl = document.getElementById('mcParticleSelect');
+            const optionExists = Array.from(selectEl.options).some(opt => opt.value === layer.particleId);
+            selectEl.value = optionExists ? layer.particleId : 'custom';
+
+            // ปุ่มเลือกรูปทรง
+            document.querySelectorAll('.shape-btn').forEach(btn => {
+                const isMatch = btn.dataset.shape === layer.shape;
+                btn.className = `shape-btn p-2.5 rounded-xl border text-left transition ${
+                    isMatch
+                        ? 'bg-emerald-600/25 border-emerald-500 text-white shadow'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`;
+            });
+
+            // แสดง/ซ่อนแถบแจ้งเตือนโหมดวาดเส้นอิสระ
+            const isFreehand = layer.shape === 'freehand';
+            document.getElementById('freehandControls').classList.toggle('hidden', !isFreehand);
+            document.getElementById('drawBanner').classList.toggle('hidden', !isFreehand);
+            updateDrawnPointsUI();
+
+            // สไลเดอร์และตัวเลือกสี
+            const numericFields = ['radius', 'yOffset', 'spinSpeed', 'spawnRate', 'speed', 'gravity', 'lifetime', 'size'];
+            numericFields.forEach(field => {
+                const input = document.getElementById(`input-${field}`);
+                const label = document.getElementById(`val-${field}`);
+                if (input) input.value = layer[field];
+                if (label) label.textContent = layer[field];
+            });
+
+            document.getElementById('input-startColor').value = layer.startColor;
+            document.getElementById('val-startColor').textContent = layer.startColor.toUpperCase();
+            document.getElementById('input-endColor').value = layer.endColor;
+            document.getElementById('val-endColor').textContent = layer.endColor.toUpperCase();
+        }
+
+        // --- 8. ระบบส่งออกเป็นไฟล์ Minecraft Bedrock (.mcpack และ .json) ---
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        function sanitizeIdentifier(str, fallback) {
+            const clean = str.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+            return clean || fallback;
+        }
+
+        function updateExportPreview() {
+            const ns = sanitizeIdentifier(document.getElementById('exportNamespace').value, 'custom');
+            const id = sanitizeIdentifier(document.getElementById('exportEffectId').value, 'my_effect');
+            document.getElementById('commandPreviewBox').textContent = `/particle ${ns}:${id} ~ ~1 ~`;
+        }
+
+        // สร้างโครงสร้าง JSON มาตรฐานของ Minecraft Bedrock Particle (Format 1.10.0)
+        function buildBedrockParticleJSON(namespace, effectId, layer) {
+            const fullIdentifier = `${namespace}:${effectId}`;
+
+            // กำหนด Shape Component ตามรูปแบบที่ผู้ใช้เลือก
+            let shapeComponent = {};
+            if (layer.shape === 'sphere') {
+                shapeComponent = {
+                    "minecraft:emitter_shape_sphere": {
+                        "radius": layer.radius,
+                        "surface_only": true,
+                        "direction": "outwards"
+                    }
+                };
+            } else if (layer.shape === 'ring' || layer.shape === 'slash' || layer.shape === 'helix') {
+                shapeComponent = {
+                    "minecraft:emitter_shape_disc": {
+                        "radius": layer.radius,
+                        "surface_only": true,
+                        "direction": "outwards"
+                    }
+                };
+            } else {
+                shapeComponent = {
+                    "minecraft:emitter_shape_point": {
+                        "offset": [0, layer.yOffset, 0],
+                        "direction": ["Math.random(-1, 1)", "Math.random(0.2, 1)", "Math.random(-1, 1)"]
+                    }
+                };
+            }
+
+            return {
+                "format_version": "1.10.0",
+                "particle_effect": {
+                    "description": {
+                        "identifier": fullIdentifier,
+                        "basic_render_parameters": {
+                            "material": "particles_alpha",
+                            "texture": "textures/particle/particles"
+                        }
+                    },
+                    "components": {
+                        "minecraft:emitter_rate_steady": {
+                            "spawn_rate": layer.spawnRate,
+                            "max_particles": Math.max(100, layer.spawnRate * 3)
+                        },
+                        "minecraft:emitter_lifetime_looping": {
+                            "active_time": 2.0,
+                            "sleep_time": 0.0
+                        },
+                        ...shapeComponent,
+                        "minecraft:particle_lifetime_expression": {
+                            "max_lifetime": layer.lifetime
+                        },
+                        "minecraft:particle_initial_speed": layer.speed,
+                        "minecraft:particle_motion_dynamic": {
+                            "linear_acceleration": [0, -layer.gravity, 0],
+                            "linear_drag_coefficient": 1.0
+                        },
+                        "minecraft:particle_appearance_billboard": {
+                            "size": [layer.size, layer.size],
+                            "facing_camera_mode": "rotate_xyz",
+                            "uv": {
+                                "texture_width": 128,
+                                "texture_height": 128,
+                                "uv": [0, 0],
+                                "uv_size": [8, 8]
+                            }
+                        },
+                        "minecraft:particle_appearance_tinting": {
+                            "color": {
+                                "interpolant": "v.particle_age / v.particle_lifetime",
+                                "gradient": {
+                                    "0.0": layer.startColor,
+                                    "1.0": layer.endColor
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        // ดาวน์โหลดไฟล์ .json เดี่ยว
+        function exportJsonFile() {
+            const ns = sanitizeIdentifier(document.getElementById('exportNamespace').value, 'custom');
+            const id = sanitizeIdentifier(document.getElementById('exportEffectId').value, 'my_effect');
+            const mainLayer = state.layers[0];
+            const jsonObj = buildBedrockParticleJSON(ns, id, mainLayer);
+
+            const blob = new Blob([JSON.stringify(jsonObj, null, 2)], { type: 'application/json' });
+            triggerDownload(blob, `${id}.json`);
+            showToast(`ดาวน์โหลด ${id}.json สำเร็จ!`);
+        }
+
+        // สร้างและดาวน์โหลดแพ็กเกจ .mcpack จริงด้วย JSZip
+        async function exportMcpack() {
+            if (typeof JSZip === 'undefined') {
+                showToast('ไม่สามารถโหลดตัวสร้าง ZIP ได้ กรุณาตรวจสอบอินเทอร์เน็ต');
+                return;
+            }
+
+            const ns = sanitizeIdentifier(document.getElementById('exportNamespace').value, 'custom');
+            const id = sanitizeIdentifier(document.getElementById('exportEffectId').value, 'my_effect');
+
+            const zip = new JSZip();
+
+            // 1. สร้างไฟล์ manifest.json สำหรับ Resource Pack
+            const manifest = {
+                "format_version": 2,
+                "header": {
+                    "name": `MC Particle Studio: ${id}`,
+                    "description": `สร้างจาก MC Bedrock Particle Studio (${state.layers.length} เลเยอร์)`,
+                    "uuid": generateUUID(),
+                    "version": [1, 0, 0],
+                    "min_engine_version": [1, 20, 0]
+                },
+                "modules": [
+                    {
+                        "description": "Custom Particle Effects",
+                        "type": "resources",
+                        "uuid": generateUUID(),
+                        "version": [1, 0, 0]
+                    }
+                ]
+            };
+            zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+
+            // 2. สร้างไฟล์อนุภาคในโฟลเดอร์ particles/ สำหรับทุกเลเยอร์
+            const particlesFolder = zip.folder('particles');
+            state.layers.forEach((layer, idx) => {
+                const layerEffectId = idx === 0 ? id : `${id}_layer_${idx + 1}`;
+                const particleJson = buildBedrockParticleJSON(ns, layerEffectId, layer);
+                particlesFolder.file(`${layerEffectId}.json`, JSON.stringify(particleJson, null, 2));
+            });
+
+            // 3. บีบอัดเป็นไฟล์ .mcpack และสั่งดาวน์โหลด
+            const content = await zip.generateAsync({ type: 'blob' });
+            triggerDownload(content, `${id}.mcpack`);
+            showToast(`ส่งออก ${id}.mcpack สำเร็จ! แตะเปิดไฟล์เพื่อเข้าเกมได้เลย`);
+        }
+
+        function triggerDownload(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        function copyCommand() {
+            const cmdText = document.getElementById('commandPreviewBox').textContent.trim();
+            const tempInput = document.createElement('textarea');
+            tempInput.value = cmdText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast('คัดลอกคำสั่ง /particle แล้ว!');
+        }
+
+        let toastTimer = null;
+        function showToast(msg) {
+            const toast = document.getElementById('toastBox');
+            document.getElementById('toastText').textContent = msg;
+            toast.classList.remove('opacity-0', 'translate-y-2');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+            }, 2800);
+        }
+
+        // --- 9. Main Loop & Initialization ---
+        let lastFrameTime = 0;
+        function mainLoop(timestamp) {
+            if (!lastFrameTime) lastFrameTime = timestamp;
+            const dt = Math.min((timestamp - lastFrameTime) / 1000, 0.05);
+            lastFrameTime = timestamp;
+
+            updateSimulation(dt);
+            renderCanvas();
+            requestAnimationFrame(mainLoop);
+        }
+
+        window.addEventListener('resize', resizePreviewCanvas);
+        window.onload = function () {
+            resizePreviewCanvas();
+            loadPreset('lightning');
+            requestAnimationFrame(mainLoop);
+        };
+    </script>
+</body>
+</html>
